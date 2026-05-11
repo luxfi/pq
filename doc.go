@@ -1,4 +1,4 @@
-// Package annulus defines the strict post-quantum profile that
+// Package pq defines the strict post-quantum profile that
 // constrains which cryptographic operations a Quasar node accepts.
 //
 // The package contains no cryptographic primitives. It expresses a
@@ -35,4 +35,4 @@
 // Environment override: when QUASAR_STRICT_PQ is set to a truthy
 // value, [ProfileFromEnv] returns [Strict]; otherwise it returns
 // [Permissive]. Mainnet binaries set this in their startup path.
-package annulus
+package pq

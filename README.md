@@ -1,6 +1,6 @@
-# annulus
+# pq
 
-`annulus` defines the strict post-quantum profile that constrains
+`pq` defines the strict post-quantum profile that constrains
 which cryptographic operations a Quasar node accepts.
 
 The package contains no cryptographic primitives. It expresses a
@@ -25,8 +25,8 @@ the operations do not know how the profile is selected.
 
 | Profile | Construction | Effect |
 |---|---|---|
-| Strict | `annulus.Strict()` | Forbids every classical category. |
-| Permissive | `annulus.Permissive()` | Admits every operation. |
+| Strict | `pq.Strict()` | Forbids every classical category. |
+| Permissive | `pq.Permissive()` | Admits every operation. |
 
 A profile that sets `StrictPQ` but omits any individual `Forbid*` flag
 is ill-formed. `Profile.Canonical` rewrites such a profile into the
@@ -49,14 +49,14 @@ The `Category` type groups operations the same Forbid* flag governs:
 ## Use
 
 ```go
-import "github.com/luxfi/annulus"
+import "github.com/luxfi/pq"
 
 // Bind the active profile once at startup.
-ctx := annulus.WithProfile(context.Background(), annulus.ProfileFromEnv())
+ctx := pq.WithProfile(context.Background(), pq.ProfileFromEnv())
 
 // Each constrained primitive calls Refuse at the top of its Run.
 func (p *kzgPointEval) Run(ctx context.Context, in []byte) ([]byte, error) {
-    if err := annulus.Refuse(ctx, annulus.KZGEval); err != nil {
+    if err := pq.Refuse(ctx, pq.KZGEval); err != nil {
         return nil, err
     }
     // ... evaluation
