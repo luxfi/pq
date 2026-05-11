@@ -1,4 +1,4 @@
-package annulus
+package pq
 
 import (
 	"context"
@@ -16,13 +16,13 @@ type Violation struct {
 
 // Error implements the error interface.
 func (v *Violation) Error() string {
-	return fmt.Sprintf("annulus: %s forbidden under profile %x", v.Op, v.Profile[:8])
+	return fmt.Sprintf("pq: %s forbidden under profile %x", v.Op, v.Profile[:8])
 }
 
 // ErrUnknownOp is returned when [Refuse] is invoked with an [Op] that
 // the package does not recognize. Callers must ship a recognized op;
 // the failure-closed default is to refuse.
-var ErrUnknownOp = errors.New("annulus: unknown op")
+var ErrUnknownOp = errors.New("pq: unknown op")
 
 // Refuse reports whether the profile bound to ctx admits op.
 // A nil return means the op is allowed. A non-nil error means the op
@@ -36,7 +36,7 @@ var ErrUnknownOp = errors.New("annulus: unknown op")
 // own lane.
 func Refuse(ctx context.Context, op Op) error {
 	if ctx == nil {
-		panic("annulus.Refuse: nil context")
+		panic("pq.Refuse: nil context")
 	}
 	p := FromContext(ctx)
 	return RefuseUnder(p, op)

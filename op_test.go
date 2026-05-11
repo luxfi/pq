@@ -1,4 +1,4 @@
-package annulus
+package pq
 
 import "testing"
 

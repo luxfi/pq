@@ -1,4 +1,4 @@
-module github.com/luxfi/annulus
+module github.com/luxfi/pq
 
 go 1.23.0
 
