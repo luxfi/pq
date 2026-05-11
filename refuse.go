@@ -1,67 +1,72 @@
 package pq
 
 import (
-	"context"
 	"errors"
-	"fmt"
+	"sync/atomic"
 )
 
-// Violation is returned when an operation is inadmissible under the
-// active profile. It records the op that was rejected and the hash of
-// the profile that rejected it.
-type Violation struct {
-	Op      Op
-	Profile [32]byte
-}
+// Family errors. Each names the specific primitive family it refuses;
+// dashboards and replay tools attribute violations to the right family.
+var (
+	ErrEcrecoverForbidden  = errors.New("ecrecover forbidden by chain security profile (PQ)")
+	ErrP256VerifyForbidden = errors.New("p256Verify forbidden by chain security profile (PQ)")
+	ErrSHA256Forbidden     = errors.New("sha256 forbidden by chain security profile (PQ)")
+	ErrRIPEMD160Forbidden  = errors.New("ripemd160 forbidden by chain security profile (PQ)")
+	ErrBlake2FForbidden    = errors.New("blake2F forbidden by chain security profile (PQ)")
+	ErrBn256Forbidden      = errors.New("alt_bn128 (BN254) family forbidden by chain security profile (PQ)")
+	ErrBLS12381Forbidden   = errors.New("BLS12-381 family forbidden by chain security profile (PQ)")
+	ErrKZGForbidden        = errors.New("KZG point evaluation forbidden by chain security profile (PQ)")
+)
 
-// Error implements the error interface.
-func (v *Violation) Error() string {
-	return fmt.Sprintf("pq: %s forbidden under profile %x", v.Op, v.Profile[:8])
-}
-
-// ErrUnknownOp is returned when [Refuse] is invoked with an [Op] that
-// the package does not recognize. Callers must ship a recognized op;
-// the failure-closed default is to refuse.
-var ErrUnknownOp = errors.New("pq: unknown op")
-
-// Refuse reports whether the profile bound to ctx admits op.
-// A nil return means the op is allowed. A non-nil error means the op
-// must not execute.
-//
-// When ctx carries no profile, the [Permissive] profile is used. When
-// ctx is nil, Refuse panics; this signals a programmer error.
-//
-// Refuse is the single profile gate. Each constrained operation calls
-// it once at the top of its entry point and otherwise proceeds in its
-// own lane.
-func Refuse(ctx context.Context, op Op) error {
-	if ctx == nil {
-		panic("pq.Refuse: nil context")
+// errorFor returns the family-specific error for op, or nil if op is
+// admissible or unknown.
+func errorFor(op Op) error {
+	switch op {
+	case OpEcrecover:
+		return ErrEcrecoverForbidden
+	case OpP256Verify:
+		return ErrP256VerifyForbidden
+	case OpSHA256:
+		return ErrSHA256Forbidden
+	case OpRIPEMD160:
+		return ErrRIPEMD160Forbidden
+	case OpBlake2F:
+		return ErrBlake2FForbidden
+	case OpBn256Add, OpBn256ScalarMul, OpBn256Pairing:
+		return ErrBn256Forbidden
+	case OpBLS12381G1Add, OpBLS12381G1MSM,
+		OpBLS12381G2Add, OpBLS12381G2MSM,
+		OpBLS12381Pairing, OpBLS12381MapG1, OpBLS12381MapG2:
+		return ErrBLS12381Forbidden
+	case OpKZGPointEval:
+		return ErrKZGForbidden
 	}
-	p := FromContext(ctx)
-	return RefuseUnder(p, op)
+	return nil
 }
 
-// RefuseUnder is the context-free variant of [Refuse]. It is the
-// canonical entry point for unit tests and for subsystems that resolve
-// the active profile through their own indirection.
-func RefuseUnder(p Profile, op Op) error {
-	cat := CategoryOf(op)
-	if cat == CatUnknown {
-		return fmt.Errorf("%w: %s", ErrUnknownOp, op)
-	}
-	if !p.Forbids(cat) {
+// active holds the package-level profile. nil = classical semantics.
+var active atomic.Pointer[Profile]
+
+// SetActive installs the package-level profile. Callers without
+// context (EVM precompiles whose Run signature lacks ctx) read this.
+// Call once at chain bootstrap.
+func SetActive(p *Profile) { active.Store(p) }
+
+// Active returns the package-level profile, or nil if none has been
+// installed (classical semantics).
+func Active() *Profile { return active.Load() }
+
+// Refuse reports whether the active package-level profile admits op.
+// Returns nil when admissible; family-specific error otherwise.
+// Refuse(OpUnknown) always returns nil.
+func Refuse(op Op) error { return RefuseUnder(active.Load(), op) }
+
+// RefuseUnder is the context-free variant of [Refuse]: it consults the
+// supplied profile directly. Suitable for tests and for subsystems
+// that resolve the active profile through their own indirection.
+func RefuseUnder(p *Profile, op Op) error {
+	if p == nil || !p.Forbids(op) {
 		return nil
 	}
-	h := p.Hash()
-	return &Violation{Op: op, Profile: h}
-}
-
-// MustRefuse is the panicking variant of [Refuse]; suitable only for
-// initialisation paths where a profile violation indicates a build
-// configuration error rather than a runtime input.
-func MustRefuse(ctx context.Context, op Op) {
-	if err := Refuse(ctx, op); err != nil {
-		panic(err)
-	}
+	return errorFor(op)
 }
