@@ -2,8 +2,15 @@ package pq
 
 import (
 	"errors"
+	"os"
+	"sync"
 	"sync/atomic"
 )
+
+// stderr is the destination for the deprecation warning emitted by the
+// package-level shims. It is unexported; tests that call the shims
+// will receive one stderr line per process.
+var stderr = os.Stderr
 
 // Family errors. Each names the specific primitive family it refuses;
 // dashboards and replay tools attribute violations to the right family.
@@ -44,29 +51,65 @@ func errorFor(op Op) error {
 	return nil
 }
 
-// active holds the package-level profile. nil = classical semantics.
-var active atomic.Pointer[Profile]
-
-// SetActive installs the package-level profile. Callers without
-// context (EVM precompiles whose Run signature lacks ctx) read this.
-// Call once at chain bootstrap.
-func SetActive(p *Profile) { active.Store(p) }
-
-// Active returns the package-level profile, or nil if none has been
-// installed (classical semantics).
-func Active() *Profile { return active.Load() }
-
-// Refuse reports whether the active package-level profile admits op.
-// Returns nil when admissible; family-specific error otherwise.
-// Refuse(OpUnknown) always returns nil.
-func Refuse(op Op) error { return RefuseUnder(active.Load(), op) }
-
-// RefuseUnder is the context-free variant of [Refuse]: it consults the
-// supplied profile directly. Suitable for tests and for subsystems
-// that resolve the active profile through their own indirection.
-func RefuseUnder(p *Profile, op Op) error {
+// RefuseUnder reports whether p admits op. Returns nil when admissible
+// (including when p is nil — classical semantics) or family-specific
+// error otherwise. RefuseUnder(OpUnknown) always returns nil.
+//
+// This is the canonical, per-profile gate. Callers should hold a
+// *Profile (typically from chain config) and call this method directly.
+func (p *Profile) RefuseUnder(op Op) error {
 	if p == nil || !p.Forbids(op) {
 		return nil
 	}
 	return errorFor(op)
+}
+
+// active holds a deprecated, package-level profile.
+//
+// Deprecated: a process-global profile is wrong for multi-chain hosts
+// (last-writer-wins). Hold a *Profile per chain (e.g. on ChainConfig)
+// and call (*Profile).RefuseUnder directly. The package-level state is
+// retained as a compatibility shim only.
+var active atomic.Pointer[Profile]
+
+// warnOnce guards the one-shot deprecation warning emitted from each
+// shim. We do not import a logger here (pq has no log dep); the message
+// is written to standard error so misuse is loud but harmless.
+var warnOnce sync.Once
+
+func warnDeprecated() {
+	warnOnce.Do(func() {
+		// stderr write avoids a logger dependency; one line per process.
+		const msg = "pq: package-global active profile is deprecated; use per-chain ChainConfig.PQ and (*Profile).RefuseUnder instead\n"
+		// stderr write is best-effort.
+		_, _ = stderr.Write([]byte(msg))
+	})
+}
+
+// SetActive installs the package-level profile.
+//
+// Deprecated: store the profile per chain (e.g. ChainConfig.PQ) and use
+// (*Profile).RefuseUnder. The package-global path has last-writer-wins
+// semantics across chains hosted in one process.
+func SetActive(p *Profile) {
+	warnDeprecated()
+	active.Store(p)
+}
+
+// Active returns the package-level profile, or nil if none has been
+// installed (classical semantics).
+//
+// Deprecated: see [SetActive].
+func Active() *Profile {
+	warnDeprecated()
+	return active.Load()
+}
+
+// Refuse reports whether the package-level profile admits op.
+//
+// Deprecated: call (*Profile).RefuseUnder on the per-chain profile.
+// Retained as a shim that reads the deprecated package-level state.
+func Refuse(op Op) error {
+	warnDeprecated()
+	return active.Load().RefuseUnder(op)
 }
