@@ -88,8 +88,8 @@ func TestRefuseUnderStrict(t *testing.T) {
 		{OpKZGPointEval, ErrKZGForbidden},
 	}
 	for _, c := range cases {
-		if err := RefuseUnder(p, c.op); !errors.Is(err, c.wantErr) {
-			t.Errorf("RefuseUnder(Strict, %v) want %v, got %v", c.op, c.wantErr, err)
+		if err := p.RefuseUnder(c.op); !errors.Is(err, c.wantErr) {
+			t.Errorf("Strict.RefuseUnder(%v) want %v, got %v", c.op, c.wantErr, err)
 		}
 	}
 }
@@ -100,26 +100,27 @@ func TestRefuseUnderPermissive(t *testing.T) {
 		if op == OpUnknown {
 			continue
 		}
-		if err := RefuseUnder(p, op); err != nil {
-			t.Errorf("RefuseUnder(Permissive, %v) want nil, got %v", op, err)
+		if err := p.RefuseUnder(op); err != nil {
+			t.Errorf("Permissive.RefuseUnder(%v) want nil, got %v", op, err)
 		}
 	}
 }
 
 func TestRefuseUnderNilIsPermissive(t *testing.T) {
+	var p *Profile
 	for op := range opName {
-		if err := RefuseUnder(nil, op); err != nil {
-			t.Errorf("RefuseUnder(nil, %v) want nil, got %v", op, err)
+		if err := p.RefuseUnder(op); err != nil {
+			t.Errorf("nil.RefuseUnder(%v) want nil, got %v", op, err)
 		}
 	}
 }
 
 func TestRefuseUnknownOp(t *testing.T) {
-	if err := RefuseUnder(Strict(), OpUnknown); err != nil {
-		t.Errorf("RefuseUnder(Strict, OpUnknown) want nil, got %v", err)
+	if err := Strict().RefuseUnder(OpUnknown); err != nil {
+		t.Errorf("Strict.RefuseUnder(OpUnknown) want nil, got %v", err)
 	}
-	if err := RefuseUnder(Strict(), Op(0xff)); err != nil {
-		t.Errorf("RefuseUnder(Strict, Op(0xff)) want nil, got %v", err)
+	if err := Strict().RefuseUnder(Op(0xff)); err != nil {
+		t.Errorf("Strict.RefuseUnder(Op(0xff)) want nil, got %v", err)
 	}
 }
 
