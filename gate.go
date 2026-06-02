@@ -43,11 +43,11 @@ package pq
 // PQEvidencer is the per-input contract: does the input carry
 // the post-quantum authentication material the gate needs?
 //
-//   • warp.EnvelopeV2          → HasPQEvidence = HasMLDSACertSet()
-//   • zap.Attestation          → HasPQEvidence = att != nil && len(Sig) > 0
-//   • dex.SignedOrderPQ        → HasPQEvidence = true   (the type itself is the evidence)
-//   • dex.SignedOrder          → HasPQEvidence = false  (classical, no PQ evidence)
-//   • lqd tx (MLDSATxType)     → HasPQEvidence = tx.Type() == MLDSATxType
+//   - warp.EnvelopeV2          → HasPQEvidence = HasMLDSACertSet()
+//   - zap.Attestation          → HasPQEvidence = att != nil && len(Sig) > 0
+//   - dex.SignedOrderPQ        → HasPQEvidence = true   (the type itself is the evidence)
+//   - dex.SignedOrder          → HasPQEvidence = false  (classical, no PQ evidence)
+//   - lqd tx (MLDSATxType)     → HasPQEvidence = tx.Type() == MLDSATxType
 //
 // Nil-safe: the gate checks for a nil PQEvidencer before calling
 // HasPQEvidence, so consumers can pass nil to mean "no evidence
@@ -69,18 +69,18 @@ type Verify func() error
 // ValidateMode is the canonical strict-PQ admission gate. One
 // function dispatches the entire mode policy:
 //
-//   • ModeClassical:
-//       returns nil (PQ evidence ignored).
+//   - ModeClassical:
+//     returns nil (PQ evidence ignored).
 //
-//   • ModeHybrid:
-//       evidence present → validate via the supplied Verify;
-//       evidence absent  → return nil (caller logs stale-PQ
-//                          warning; classical verification path
-//                          remains the trust root).
+//   - ModeHybrid:
+//     evidence present → validate via the supplied Verify;
+//     evidence absent  → return nil (caller logs stale-PQ
+//     warning; classical verification path
+//     remains the trust root).
 //
-//   • ModeStrictPQ:
-//       evidence absent  → ErrClassicalAuthForbidden;
-//       evidence present → validate via the supplied Verify.
+//   - ModeStrictPQ:
+//     evidence absent  → ErrClassicalAuthForbidden;
+//     evidence present → validate via the supplied Verify.
 //
 // verify may be nil — the gate still enforces the
 // "evidence present under strict-PQ" invariant but skips the
@@ -116,7 +116,7 @@ func ValidateMode(mode Mode, evidence PQEvidencer, verify Verify) error {
 // CALLER has already decided "I am a strict-PQ consumer, refuse
 // without evidence." Equivalent to:
 //
-//   ValidateMode(ModeStrictPQ, evidence, verify)
+//	ValidateMode(ModeStrictPQ, evidence, verify)
 //
 // Exists as a separate name so call sites that mean "strict-PQ
 // only, no hybrid fallback" are grep-able.
