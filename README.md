@@ -1,3 +1,5 @@
+<p align="center"><img src=".github/hero.svg" alt="pq" width="880"></p>
+
 # pq
 
 `pq` defines the strict post-quantum profile that constrains which
